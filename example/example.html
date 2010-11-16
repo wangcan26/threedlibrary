@@ -263,13 +263,16 @@ function initialize() {
     var across = 6;
     var lightColor = spherePer.lightColor;
     var half = (across - 1) * 0.5;
-		for (var xx = 0; xx < across; ++xx) {
+    for (var xx = 0; xx < across; ++xx) {
       for (var yy = 0; yy < across; ++yy) {
         for (var zz = 0; zz < across; ++zz) {
-					lightColor[0] = xx / across;
-					lightColor[1] = yy / across;
-					lightColor[2] = zz / across;
-          fast.matrix4.translation(world, [xx - half, yy - half, zz - half]),
+          lightColor[0] = xx / across;
+          lightColor[1] = yy / across;
+          lightColor[2] = zz / across;
+          var scale = (xx + yy + zz) % 4 / 4 + 0.5;
+          fast.matrix4.scaling(m4t0, [scale, scale, scale]);
+          fast.matrix4.translation(m4t1, [xx - half, yy - half, zz - half]);
+          fast.matrix4.mul(world, m4t0, m4t1);
           fast.matrix4.mul(worldViewProjection, world, viewProjection);
           fast.matrix4.inverse(worldInverse, world);
           fast.matrix4.transpose(worldInverseTranspose, worldInverse);
