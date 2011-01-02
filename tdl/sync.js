@@ -55,10 +55,11 @@ tdl.sync = tdl.sync || {};
  * @param {!Object} settings The object that contains the settings you
  *     want kept in sync.
  */
-tdl.sync.SyncManager = function(settings) {
+tdl.sync.SyncManager = function(settings, opt_callback) {
   this.settings = settings;
   this.putCount = 0;
   this.getCount = 0;
+  this.callback = opt_callback || function() {};
 
   // This probably should not be here.
   try {
@@ -105,9 +106,10 @@ tdl.sync.SyncManager.prototype.init = function(server, port, slave) {
   this.socket.connect();
   this.socket.on('message', function(obj) {
     ++that.getCount;
-    tdl.log("--GET:[", g_getCount, "]-------------");
-    tdl.dumpObj(obj);
+    //tdl.log("--GET:[", g_getCount, "]-------------");
+    //tdl.dumpObj(obj);
     that.applySettings_(obj, that.settings);
+    that.callback(obj);
   });
 };
 
@@ -121,8 +123,13 @@ tdl.sync.SyncManager.prototype.applySettings_ = function(obj, dst) {
   for (var name in obj) {
     var value = obj[name];
     if (typeof value == 'object') {
-      this.applySettings_(value, dst[name]);
       //tdl.log("apply->: ", name);
+      var newDst = dst[name];
+      if (!newDst) {
+        newDst = {};
+        dst[name] = newDst;
+      }
+      this.applySettings_(value, newDst);
     } else {
       //tdl.log("apply: ", name, "=", value);
       dst[name] = value;
@@ -143,13 +150,14 @@ tdl.sync.SyncManager.prototype.setSettings = function(settings) {
     if (!this.slave) {
       if (this.socket) {
         ++this.putCount;
-        tdl.log("--PUT:[", this.putCount, "]-------------");
-        tdl.dumpObj(settings);
+        //tdl.log("--PUT:[", this.putCount, "]-------------");
+        //tdl.dumpObj(settings);
         this.socket.send(settings);
       }
     }
   } else {
     this.applySettings_(settings, this.settings);
+    this.callback(settings);
   }
 };
 

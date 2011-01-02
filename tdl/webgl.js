@@ -71,58 +71,45 @@ tdl.webgl.GET_A_WEBGL_BROWSER = '' +
  * Mesasge for need better hardware
  * @type {string}
  */
-tdl.webgl.NEED_HARDWARE = '' +
-  "It doesn't appear your computer can support WebGL.<br/>" +
-  '<a href="http://get.webgl.org">Click here for more information.</a>';
+tdl.webgl.OTHER_PROBLEM = '' +
+  "It does not appear your computer supports WebGL.<br/>" +
+  '<a href="http://get.webgl.org/troubleshooting/">Click here for more information.</a>';
 
 /**
- * Creates a webgl context and fils out teh
- * @param {string} canvasContainerId id of container of th
- *        canvas.
+ * Creates a webgl context.
+ * @param {Element} canvas. The canvas element to create a
+ *     context from.
+ * @param {WebGLContextCreationAttirbutes} opt_attribs Any
+ *     creation attributes you want to pass in.
+ * @param {function:(msg)} opt_onError An function to call
+ *     if there is an error during creation.
+ * @return {!WebGLRenderingContext} The created context.
  */
-tdl.webgl.setupWebGL = function(canvasContainerId, opt_canvas) {
-  var container = document.getElementById(canvasContainerId);
-  var context;
-  if (!opt_canvas) {
-    opt_canvas = container.getElementsByTagName("canvas")[0];
-  }
-  if (!opt_canvas) {
-    // this browser doesn't support the canvas tag at all. Not even 2d.
-    container.innerHTML = tdl.webgl.makeFailHTML(
-        tdl.webgl.GET_A_WEBGL_BROWSER);
-    return;
-  }
-
-  function handleCreationError() {
-    // TODO(gman): Set error based on why creation failed.
+tdl.webgl.setupWebGL = function(canvas, opt_attribs, opt_onError) {
+  function handleCreationError(msg) {
+    var container = canvas.parentNode;
+    if (container) {
+      var str = window.WebGLRenderingContext ?
+           tdl.webgl.OTHER_PROBLEM :
+           tdl.webgl.GET_A_WEBGL_BROWSER;
+      if (msg) {
+        str += "<br/><br/>Status: " + msg;
+      }
+      container.innerHTML = tdl.webgl.makeFailHTML(str);
+    }
   };
 
-  // opt_canvas.addEventHandler('webglcontextcreationerror', handleCreationError);
-  var context = tdl.webgl.create3DContext(opt_canvas);
+  opt_onError = opt_onError || handleCreationError;
+
+  if (canvas.addEventListener) {
+    canvas.addEventListener("webglcontextcreationerror", function(event) {
+          opt_onError(event.statusMessage);
+        }, false);
+  }
+  var context = tdl.webgl.create3DContext(canvas, opt_attribs);
   if (!context) {
-    // TODO(gman): fix to official way to detect that it's the user's machine, not the browser.
-    var browserStrings = navigator.userAgent.match(/(\w+\/.*? )/g);
-    var browsers = {};
-    try {
-      for (var b = 0; b < browserStrings.length; ++b) {
-        var parts = browserStrings[b].match(/(\w+)/g);
-        var bb = [];
-        for (var ii = 1; ii < parts.length; ++ii) {
-          bb.push(parseInt(parts[ii]));
-        }
-        browsers[parts[0]] = bb;
-      }
-    } catch (e) {
-    }
-    if (browsers.Chrome &&
-        (browsers.Chrome[0] > 7 ||
-         (browsers.Chrome[0] == 7 && browsers.Chrome[1] > 0) ||
-         (browsers.Chrome[0] == 7 && browsers.Chrome[1] == 0 && browsers.Chrome[2] >= 521))) {
-      container.innerHTML = tdl.webgl.makeFailHTML(
-          tdl.webgl.NEED_HARDWARE);
-    } else {
-      container.innerHTML = tdl.webgl.makeFailHTML(
-          tdl.webgl.GET_A_WEBGL_BROWSER);
+    if (!window.WebGLRenderingContext) {
+      opt_onError("");
     }
   }
   return context;
@@ -132,14 +119,14 @@ tdl.webgl.setupWebGL = function(canvasContainerId, opt_canvas) {
  * Creates a webgl context.
  * @param {!Canvas} canvas The canvas tag to get context
  *     from. If one is not passed in one will be created.
- * @return {!WebGLContext} The created context.
+ * @return {!WebGLRenderingContext} The created context.
  */
-tdl.webgl.create3DContext = function(canvas) {
+tdl.webgl.create3DContext = function(canvas, opt_attribs) {
   var names = ["webgl", "experimental-webgl", "webkit-3d", "moz-webgl"];
   var context = null;
   for (var ii = 0; ii < names.length; ++ii) {
     try {
-      context = canvas.getContext(names[ii]);
+      context = canvas.getContext(names[ii], opt_attribs);
     } catch(e) {}
     if (context) {
       break;
@@ -419,4 +406,87 @@ tdl.webgl.makeDebugContext = function(ctx, opt_onErrorFunc, opt_onFunc) {
 
   return wrapper;
 };
+
+/**
+ * Returns the animationTime in a cross browser way.
+ * @return {number} The current animationTime
+ */
+tdl.webgl.animationTime = function() {
+  if (!tdl.webgl.getAnimationTimeImpl_) {
+    tdl.webgl.getAnimationTimeImpl_ = function() {
+      var attribNames = [
+        "animationTime",
+        "webkitAnimationTime",
+        "mozAnimationTime",
+        "operaAnimationTime",
+        "msAnimationTime"
+      ];
+      for (var ii = 0; ii < attribNames.length; ++ii) {
+        var name = attribNames[ii];
+        if (window[name]) {
+          tdl.log("using window." + name);
+          return function() {
+            return window[name];
+          };
+        }
+      }
+      tdl.log("using Date.getTime");
+      return function() {
+        return (new Date()).getTime();
+      }
+    }();
+  }
+  return tdl.webgl.getAnimationTimeImpl_();
+};
+
+/**
+ * Provides requestAnimationFrame in a cross browser
+ * way.
+ * @param {!Element} element Element to request an animation frame for.
+ * @param {function(RequestAnimationEvent): void} callback. Callback that will
+ *        be called when a frame is ready.
+ */
+tdl.webgl.requestAnimationFrame = function(element, callback) {
+  if (!tdl.webgl.requestAnimationFrameImpl_) {
+    tdl.webgl.requestAnimationFrameImpl_ = function() {
+      var objects = [element, window];
+      var functionNames = [
+        "requestAnimationFrame",
+        "webkitRequestAnimationFrame",
+        "mozRequestAnimationFrame",
+        "operaRequestAnimationFrame",
+        "requestAnimationFrame"
+      ];
+      var functions = [
+        function (name) {
+          return function(element, callback) {
+            element[name].call(element, callback);
+          };
+        },
+        function (name) {
+          return function(element, callback) {
+            window[name].call(window, callback);
+          };
+        }
+      ];
+      for (var ii = 0; ii < objects.length; ++ii) {
+        var obj = objects[ii];
+        for (var jj = 0; jj < functionNames.length; ++jj) {
+          var functionName = functionNames[jj];
+          if (obj[functionName]) {
+            tdl.log("using ", functionName);
+            return functions[ii](functionName);
+          }
+        }
+      }
+      tdl.log("using window.setTimeout");
+      return function(element, callback) {
+           window.setTimeout(callback, 1000 / 70);
+        };
+    }();
+  }
+
+  tdl.webgl.requestAnimationFrameImpl_(element, callback)
+};
+
 
