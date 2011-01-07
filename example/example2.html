@@ -57,12 +57,19 @@ tdl.require('tdl.fast');
 tdl.require('tdl.fps');
 tdl.require('tdl.log');
 tdl.require('tdl.math');
+tdl.require('tdl.misc');
 tdl.require('tdl.models');
 tdl.require('tdl.primitives');
 tdl.require('tdl.programs');
 tdl.require('tdl.textures');
 tdl.require('tdl.webgl');
 window.onload = initialize;
+
+var g = {
+ across: 10,
+ hdiv: 10,
+ vdiv: 12
+};
 
 // globals
 var gl;                   // the gl context.
@@ -118,7 +125,7 @@ function setupSphere() {
   var program = createProgramFromTags(
       'sphereVertexShader',
       'sphereFragmentShader');
-  var arrays = tdl.primitives.createSphere(0.4, 10, 12);
+  var arrays = tdl.primitives.createSphere(0.4, g.hdiv, g.vdiv);
 
   return new tdl.models.Model(program, arrays, textures);
 }
@@ -136,6 +143,8 @@ function initialize() {
   if (g_debug) {
     gl = tdl.webgl.makeDebugContext(gl, undefined, LogGLCall);
   }
+
+  tdl.misc.applyUrlSettings(g);
 
   Log("--Setup Sphere---------------------------------------");
   var sphere = setupSphere();
@@ -247,7 +256,7 @@ function initialize() {
 
     Log("--Draw sphere---------------------------------------");
     sphere.drawPrep(sphereConst);
-    var across = 10;
+    var across = g.across;
     var lightColor = spherePer.lightColor;
     var half = (across - 1) * 0.5;
     for (var xx = 0; xx < across; ++xx) {
