@@ -193,11 +193,10 @@ function initialize() {
     worldInverseTranspose: worldInverseTranspose};
 
   var frameCount = 0;
-  var intervalId = setInterval(render, 1000.0 / 70.0);
   function render() {
     ++frameCount;
-    if (g_drawOnce) {
-      clearInterval(intervalId);
+    if (!g_drawOnce) {
+      tdl.webgl.requestAnimationFrame(render, canvas);
     }
     var now = (new Date()).getTime() * 0.001;
     var elapsedTime;
@@ -281,6 +280,7 @@ function initialize() {
     // turn off logging after 1 frame.
     g_logGLCalls = false;
   }
+  render();
   return true;
 }
 </script>
