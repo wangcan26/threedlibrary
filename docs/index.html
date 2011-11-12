@@ -6,7 +6,7 @@
 <pre>
 I hope the code is pretty straight forward. There's a simple example here
 
-http://greggman.github.com/threedlibrary/example/example.html
+<a href="http://threedlibrary.googlecode.com/hg/example/example.html">http://threedlibrary.googlecode.com/hg/example/example.html</a>
 
 Briefly...
 
@@ -40,7 +40,7 @@ Loading Textures
       name2: tdl.textures.loadTexture(url)
     };
 
-Loads your textures. The key names must match whatever you called the samplers 
+Loads your textures. The property names must match whatever you called the samplers 
 in your shaders. loadTexture can take `[url]` for an image, `[r,g,b,a]` for solid 
 texture. `[url,url,url,url,url,url]` for a cubemap and also `[url]` for a cubemap 
 where all 6 faces are in a cross. It can also take an img or canvas tag.
@@ -60,7 +60,7 @@ The tdl.primitives functions return an object like this
         texCoord: AttribBuffer
     };
 
-The key names must match the attributes in your vertex shader if you want to 
+The property names must match the attributes in your vertex shader if you want to 
 add more.
  
 A call to tdl.primitives.addTangentsAndBinormals adds the fields "tangent" and 
@@ -112,8 +112,6 @@ and most functions take a destination object as the first argument.
 Theoretically this is faster because you can avoid a certain number of 
 allocations. It also means the numbers in the array do not have to be queried 
 and converted from `JavaScript` Number to floats before calling glUniform.
-
-It's not actually faster in every case though...yet
 </pre>
 </body>
 </html>
