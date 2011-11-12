@@ -96,6 +96,15 @@ tdl.primitives.AttribBuffer.prototype.setElement = function(index, value) {
   }
 };
 
+tdl.primitives.AttribBuffer.prototype.fillRange = function(index, count, value) {
+  var offset = index * this.numComponents;
+  for (var jj = 0; jj < count; ++jj) {
+    for (var ii = 0; ii < this.numComponents; ++ii) {
+      this.buffer[offset++] = value[ii];
+    }
+  }
+};
+
 tdl.primitives.AttribBuffer.prototype.clone = function() {
   var copy = new tdl.primitives.AttribBuffer(
       this.numComponents, this.numElements, this.type);
@@ -404,10 +413,10 @@ tdl.primitives.clone = function(arrays) {
 };
 
 /**
- * Concats 2 sets of arrays. Assumes each set of arrays has arrays that match
- * the other sets.
+ * Concats 2 or more sets of arrays. Assumes each set of arrays has arrays that
+ * match the other sets.
  * @param {!Array<!Object.<string, !AttribBuffer>>} arrays Arrays to concat
- * @return {!Object.<string, !AttribBuffer> concatenated result.
+ * @return {!Object.<string, !AttribBuffer>} concatenated result.
  */
 tdl.primitives.concat = function(arrayOfArrays) {
   var names = {};
@@ -461,6 +470,55 @@ tdl.primitives.concat = function(arrayOfArrays) {
 };
 
 /**
+ * Same as tdl.primitives.concat except this one returns an array
+ * of arrays if the models have indices. This is because WebGL can only handle
+ * 16bit indices (ie, < 65536) So, as it is concatenating, if the data would
+ * make indices > 65535 it starts a new set of arrays.
+ *
+ * @param {!Array<!Object.<string, !AttribBuffer>>} arrays Arrays to concat
+ * @return {!{arrays:{!Array<{!Object.<string, !AttribBuffer>>,
+ *     instances:{!Array<{firstVertex:number, numVertices:number, arrayIndex:
+ *     number}>}} object result.
+ */
+//
+tdl.primitives.concatLarge = function(arrayOfArrays) {
+  // Step 2: convert instances to expanded geometry
+  var instances = [];
+  var expandedArrays = [];
+  var expandedArray;
+  var totalElements = 0;
+  for (var ii = 0; ii < arrayOfArrays.length; ++ii) {
+    // WebGL can only handle 65536 indexed vertices so check if this
+    // geometry can fit the current model
+    var array = arrayOfArrays[ii];
+    if (!expandedArray || totalElements + array.position.numElements > 65536) {
+      // Start a new array.
+      totalElements = 0;
+      expandedArray = [array];
+      expandedArrays.push(expandedArray);
+    } else {
+      // Add our new stuff on to the old one.
+      expandedArray.push(array);
+    }
+    instances.push({
+        firstVertex: totalElements,
+        numVertices: array.position.numElements,
+        arrayIndex: expandedArrays.length - 1
+    });
+    totalElements += array.position.numElements;
+  }
+
+  for (var ii = 0; ii < expandedArrays.length; ++ii) {
+    //tdl.log("concat:", ii, " of ", expandedArrays.length);
+    expandedArrays[ii] = tdl.primitives.concat(expandedArrays[ii]);
+  }
+  return {
+      arrays: expandedArrays,
+      instances: instances
+  };
+};
+
+/**
  * Applies planar UV mapping in the XZ plane.
  * @param {!AttribBuffer} positions The positions
  * @param {!AttribBuffer} texCoords The texCoords
@@ -477,6 +535,29 @@ tdl.primitives.applyPlanarUVMapping = function(positions, texCoords) {
     var v = (position[2] - extents.min[2]) / ranges[2];
     texCoords.setElement(ii, [u, v]);
   }
+};
+
+/**
+ * Takes a bunch of instances of geometry and converts them
+ * to 1 or more geometries that represent all the instances.
+ *
+ * In other words, if make a cube
+ *
+ *    var cube = tdl.primitives.createCube(1);
+ *
+ * And you put 4 of those in an array
+ *
+ *    var instances = [cube, cube, cube, cube]
+ *
+ * Then if you call this function it will return a mesh that contains
+ * all 4 cubes.  it
+ *
+ * @author gman (4/19/2011)
+ *
+ * @param instances
+ */
+tdl.primitives.expandInstancesToGeometry = function(instances) {
+
 };
 
 /**
@@ -543,7 +624,7 @@ tdl.primitives.createSphere = function(
       var uz = sinTheta * sinPhi;
       positions.push([radius * ux, radius * uy, radius * uz]);
       normals.push([ux, uy, uz]);
-      texCoords.push([u, v]);
+      texCoords.push([1 - u, v]);
     }
   }
 
@@ -702,18 +783,13 @@ tdl.primitives.createPlane = function(
   }
   var math = tdl.math;
 
-  // We are going to generate our sphere by iterating through its
-  // spherical coordinates and generating 2 triangles for each quad on a
-  // ring of the sphere.
   var numVertices = (subdivisionsWidth + 1) * (subdivisionsDepth + 1);
   var positions = new tdl.primitives.AttribBuffer(3, numVertices);
   var normals = new tdl.primitives.AttribBuffer(3, numVertices);
   var texCoords = new tdl.primitives.AttribBuffer(2, numVertices);
 
-  // Generate the individual vertices in our vertex buffer.
   for (var z = 0; z <= subdivisionsDepth; z++) {
     for (var x = 0; x <= subdivisionsWidth; x++) {
-      // Generate a vertex based on its spherical coordinates
       var u = x / subdivisionsWidth;
       var v = z / subdivisionsDepth;
       positions.push([
@@ -759,12 +835,12 @@ tdl.primitives.createPlane = function(
  * @type {!Array.<!Array.<number>>}
  */
 tdl.primitives.CUBE_FACE_INDICES_ = [
-  [3, 7, 5, 1],
-  [0, 4, 6, 2],
-  [6, 7, 3, 2],
-  [0, 1, 5, 4],
-  [5, 7, 6, 4],
-  [2, 3, 1, 0]
+  [3, 7, 5, 1], // right
+  [6, 2, 0, 4], // left
+  [6, 7, 3, 2], // ??
+  [0, 1, 5, 4], // ??
+  [7, 6, 4, 5], // front
+  [2, 3, 1, 0], // back
 ];
 
 /**
@@ -799,10 +875,10 @@ tdl.primitives.createCube = function(size) {
   ];
 
   var uvCoords = [
-    [0, 0],
     [1, 0],
-    [1, 1],
-    [0, 1]
+    [0, 0],
+    [0, 1],
+    [1, 1]
   ];
 
   var numVertices = 6 * 4;
@@ -848,58 +924,75 @@ tdl.primitives.createCube = function(size) {
  * @return {!Object.<string, !tdl.primitives.AttribBuffer>} The
  *         created plane vertices.
  */
-tdl.primitives.createFlaredCube = function(inner_size, outer_size, layercount) {
-  var numVertices = 8 * layercount;
-  var numIndices = 2 * 12 * 3 * (layercount - 1);
-
+tdl.primitives.createFlaredCube = function(innerSize, outerSize, layerCount) {
+  var numVertices = 2 * (layerCount + 1);
   var positions = new tdl.primitives.AttribBuffer(3, numVertices);
   var normals = new tdl.primitives.AttribBuffer(3, numVertices);
   var texCoords = new tdl.primitives.AttribBuffer(2, numVertices);
-  var indices = new tdl.primitives.AttribBuffer(3, numIndices, 'Uint16Array');
+  var indices = new tdl.primitives.AttribBuffer(
+      3, layerCount * 2, 'Uint16Array');
 
-  var sizeDelta = (outer_size - inner_size) / layercount
-  var size = inner_size;
-  for (var i = 0; i < layercount; i++, size += sizeDelta) {
-    var k = size / 2;
-    var cornerVertices = [
-      [-k, -k, -k], [+k, -k, -k], [+k, +k, -k], [-k, +k, -k],
-      [-k, -k, +k], [+k, -k, +k], [+k, +k, +k], [-k, +k, +k]
-    ];
-    var vs = [0, 1, 0, 1, 1, 0, 1, 0]
-    var u = i / (layercount - 1)
-    for (var v = 0; v < 8; ++v) {
-      var position = cornerVertices[v];
-      var uv = [u, vs[v]]
-      positions.push(position);
-      texCoords.push(uv);
+  // make a trapazoid plane.
+  for (var z = 0; z <= layerCount; z++) {
+    for (var x = 0; x <= 1; x++) {
+      var u = x;
+      var v = z / layerCount;
+      var width = tdl.math.lerpScalar(innerSize, outerSize, v);
+      positions.push([
+          width * u - width * 0.5,
+          0,
+          tdl.math.lerpScalar(innerSize, outerSize, v) * 0.7
+      ]);
+      normals.push([0, 1, 0]);
+      texCoords.push([v, u]);
     }
   }
 
-  function extrudeLine(offset, i1, i2) {
-    indices.push([offset + i1, offset + i2, offset + 8 + i1]);
-    indices.push([offset + i2, offset + 8 + i1, offset + 8 + i2]);
-  }
-  for (var i = 0; i < layercount - 1; i++) {
-    extrudeLine(i*8, 0, 1)
-    extrudeLine(i*8, 1, 2)
-    extrudeLine(i*8, 2, 3)
-    extrudeLine(i*8, 3, 0)
+  var numVertsAcross = 2;
+  for (var z = 0; z < layerCount; z++) {
+    // Make triangle 1 of quad.
+    indices.push([
+        (z + 0) * numVertsAcross,
+        (z + 1) * numVertsAcross,
+        (z + 0) * numVertsAcross + 1]);
 
-    extrudeLine(i*8, 4, 5)
-    extrudeLine(i*8, 5, 6)
-    extrudeLine(i*8, 6, 7)
-    extrudeLine(i*8, 7, 4)
-
-    extrudeLine(i*8, 0, 4)
-    extrudeLine(i*8, 1, 5)
-    extrudeLine(i*8, 2, 6)
-    extrudeLine(i*8, 3, 7)
+    // Make triangle 2 of quad.
+    indices.push([
+        (z + 1) * numVertsAcross,
+        (z + 1) * numVertsAcross + 1,
+        (z + 0) * numVertsAcross + 1]);
   }
 
-  return {
+  var arrays = {
     position: positions,
+    normal: normals,
     texCoord: texCoords,
-    indices: indices};
+    indices: indices
+};
+
+  // rotate it 45 degrees
+  tdl.primitives.reorient(arrays, tdl.math.matrix4.rotationX(Math.PI / 4));
+
+  // make 3 copies of plane each rotated 90
+  var planes = [arrays];
+  for (var ii = 0; ii < 3; ++ii) {
+    var clone = tdl.primitives.clone(arrays);
+    tdl.primitives.reorient(clone, tdl.math.matrix4.rotationZ(Math.PI * (ii + 1) / 2));
+    planes.push(clone);
+  }
+  // concat 4 planes to make a cone
+  var arrays = tdl.primitives.concat(planes);
+
+  // make 3 copies of cone each rotated 90
+  var cones = [arrays];
+  for (var ii = 0; ii < 3; ++ii) {
+    var clone = tdl.primitives.clone(arrays);
+    tdl.primitives.reorient(clone, tdl.math.matrix4.rotationY(Math.PI * (ii + 1) / 2));
+    cones.push(clone);
+  }
+  // concat 4 cones to make flared cube
+  var arrays = tdl.primitives.concat(cones);
+  return arrays;
 };
 
 
@@ -992,7 +1085,7 @@ tdl.primitives.createTruncatedCone = function(
           (yy < 0 || yy > verticalSubdivisions) ? 0 : (sin * cosSlant),
           (yy < 0) ? -1 : (yy > verticalSubdivisions ? 1 : sinSlant),
           (yy < 0 || yy > verticalSubdivisions) ? 0 : (cos * cosSlant)]);
-      texCoords.push([ii / radialSubdivisions, v]);
+      texCoords.push([(ii / radialSubdivisions), 1 - v]);
     }
   }
 
@@ -1046,6 +1139,92 @@ tdl.primitives.createCylinder = function(
       opt_topCap,
       opt_bottomCap);
 };
+
+/**
+ * Creates vertices for a torus, The created cone has position, normal
+ * and texCoord streams.
+ *
+ * @param {number} radius radius of center of torus circle.
+ * @param {number} thickness radius of torus ring.
+ * @param {number} radialSubdivisions The number of subdivisions around the
+ *     torus.
+ * @param {number} bodySubdivisions The number of subdivisions around the
+ *     body torus.
+ * @param {boolean} opt_startAngle start angle in radians. Default = 0.
+ * @param {boolean} opt_endAngle end angle in radians. Default = Math.PI * 2.
+ * @return {!Object.<string, !tdl.primitives.AttribBuffer>} The
+ *         created torus vertices.
+ */
+tdl.primitives.createTorus = function(
+    radius,
+    thickness,
+    radialSubdivisions,
+    bodySubdivisions,
+    opt_startAngle,
+    opt_endAngle) {
+  if (radialSubdivisions < 3) {
+    throw Error('radialSubdivisions must be 3 or greater');
+  }
+
+  if (bodySubdivisions < 3) {
+    throw Error('verticalSubdivisions must be 3 or greater');
+  }
+
+  var startAngle = opt_startAngle || 0;
+  var endAngle = opt_endAngle || Math.PI * 2;
+  var range = endAngle - startAngle;
+
+  // TODO(gman): cap the ends if not a full circle.
+
+  var numVertices = (radialSubdivisions) * (bodySubdivisions);
+  var positions = new tdl.primitives.AttribBuffer(3, numVertices);
+  var normals = new tdl.primitives.AttribBuffer(3, numVertices);
+  var texCoords = new tdl.primitives.AttribBuffer(2, numVertices);
+  var indices = new tdl.primitives.AttribBuffer(
+      3, (radialSubdivisions) * (bodySubdivisions) * 2, 'Uint16Array');
+
+  for (var slice = 0; slice < bodySubdivisions; ++slice) {
+    var v = slice / bodySubdivisions;
+    var sliceAngle = v * Math.PI * 2;
+    var sliceSin = Math.sin(sliceAngle);
+    var ringRadius = radius + sliceSin * thickness;
+    var ny = Math.cos(sliceAngle);
+    var y = ny * thickness;
+    for (var ring = 0; ring < radialSubdivisions; ++ring) {
+      var u = ring / radialSubdivisions;
+      var ringAngle = startAngle + u * range;
+      var xSin = Math.sin(ringAngle);
+      var zCos = Math.cos(ringAngle);
+      var x = xSin * ringRadius;
+      var z = zCos * ringRadius;
+      var nx = xSin * sliceSin;
+      var nz = zCos * sliceSin;
+      positions.push([x, y, z]);
+      normals.push([nx, ny, nz]);
+      texCoords.push([u, 1 - v]);
+    }
+  }
+
+  for (var slice = 0; slice < bodySubdivisions; ++slice) {
+    for (var ring = 0; ring < radialSubdivisions; ++ring) {
+      var nextRingIndex = (1 + ring) % radialSubdivisions;
+      var nextSliceIndex = (1 + slice) % bodySubdivisions;
+      indices.push([radialSubdivisions * slice          + ring,
+                    radialSubdivisions * nextSliceIndex + ring,
+                    radialSubdivisions * slice          + nextRingIndex]);
+      indices.push([radialSubdivisions * nextSliceIndex + ring,
+                    radialSubdivisions * nextSliceIndex + nextRingIndex,
+                    radialSubdivisions * slice          + nextRingIndex]);
+    }
+  }
+
+  return {
+    position: positions,
+    normal: normals,
+    texCoord: texCoords,
+    indices: indices};
+};
+
 
 /**
  * Creates a disc. The disc will be in the xz plane, centered at
@@ -1112,7 +1291,7 @@ tdl.primitives.createDisc = function(
 
       positions.push([x, 0, z]);
       normals.push([0, 1, 0]);
-      texCoords.push([Math.cos(theta), stackRadius / radius]);
+      texCoords.push([1 - (i / divisions), stack / stacks]);
       if (stack > 0) {
         // a, b, c and d are the indices of the vertices of a quad.  unless
         // the current stack is the one closest to the center, in which case
@@ -1130,7 +1309,7 @@ tdl.primitives.createDisc = function(
 
     firstIndex += divisions;
   }
-tdl.log(numVertices);
+
   return {
     position: positions,
     normal: normals,
