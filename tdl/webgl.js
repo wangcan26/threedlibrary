@@ -194,7 +194,8 @@ tdl.webgl.runHandlers_ = function(handlers) {
   }
 };
 
-tdl.webgl.registerContextLostHandler = function(handler, opt_sysHandler) {
+tdl.webgl.registerContextLostHandler = function(
+    canvas, handler, opt_sysHandler) { 
   tdl.webgl.setupCanvas_(canvas);
   if (!canvas.tdl.contextLostHandlers) {
     canvas.tdl.contextLostHandlers = [[],[]];
@@ -203,7 +204,8 @@ tdl.webgl.registerContextLostHandler = function(handler, opt_sysHandler) {
   a.push(handler);
 };
 
-tdl.webgl.registerContextRestoredHandler = function(handler, opt_sysHandler) {
+tdl.webgl.registerContextRestoredHandler = function(
+    canvas, handler, opt_sysHandler) {
   tdl.webgl.setupCanvas_(canvas);
   if (!canvas.tdl.contextRestoredHandlers) {
     canvas.tdl.contextRestoredHandlers = [[],[]];
@@ -481,7 +483,7 @@ tdl.webgl.makeDebugContext = function(ctx, opt_onErrorFunc, opt_onFunc) {
     if (typeof ctx[propertyName] == 'function') {
        wrapper[propertyName] = makeErrorWrapper(ctx, propertyName);
      } else {
-       wrapper[propertyName] = makePropertyWrappe(wrapper, ctx, propertyName);
+       makePropertyWrapper(wrapper, ctx, propertyName);
      }
   }
 

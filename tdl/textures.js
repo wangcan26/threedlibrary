@@ -116,7 +116,7 @@ tdl.textures.init_ = function(gl) {
     gl.tdl.textures = { };
     gl.tdl.textures.loadingImages = [];
     tdl.webgl.registerContextLostHandler(
-        tdl.textures.handleContextLost_, true);
+        gl.canvas, tdl.textures.handleContextLost_, true);
   }
   if (!gl.tdl.textures.maxTextureSize) {
     gl.tdl.textures.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
@@ -377,8 +377,8 @@ tdl.textures.CubeMap = function(urls) {
       gl.TEXTURE_CUBE_MAP_POSITIVE_Z,
       gl.TEXTURE_CUBE_MAP_NEGATIVE_Z];
     tdl.textures.CubeMap.offsets = [
-      [0, 1],
       [2, 1],
+      [0, 1],
       [1, 0],
       [1, 2],
       [1, 1],

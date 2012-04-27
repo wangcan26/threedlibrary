@@ -18,6 +18,7 @@ JS_FILES = [
   "../tdl/fast.js",
   "../tdl/fps.js",
   "../tdl/framebuffers.js",
+  "../tdl/fullscreen.js",
   "../tdl/io.js",
   "../tdl/loader.js",
   "../tdl/log.js",

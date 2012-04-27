@@ -222,6 +222,9 @@ tdl.programs.Program = function(vertexShader, fragmentShader) {
   var numAttribs = gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES);
   for (var ii = 0; ii < numAttribs; ++ii) {
     var info = gl.getActiveAttrib(program, ii);
+    if (!info) {
+      break;
+    }
     var name = info.name;
     if (tdl.string.endsWith(name, "[0]")) {
       name = name.substr(0, name.length - 3);
@@ -243,11 +246,35 @@ tdl.programs.Program = function(vertexShader, fragmentShader) {
     if (info.size > 1 && tdl.string.endsWith(info.name, "[0]")) {
       // It's an array.
       if (type == gl.FLOAT)
-        return function(v) { gl.uniform1fv(loc, v); };
+        return function() {
+          var old;
+          return function(v) {
+            if (v !== old) {
+              old = v;
+              gl.uniform1fv(loc, v);
+            }
+          };
+        }();
       if (type == gl.FLOAT_VEC2)
-        return function(v) { gl.uniform2fv(loc, v); };
+        return function() {
+          // I hope they don't use -1,-1 as their first draw
+          var old = new Float32Array([-1, -1]);
+          return function(v) {
+            if (v[0] != old[0] || v[1] != old[1]) {
+              gl.uniform2fv(loc, v);
+            }
+          };
+        }();
       if (type == gl.FLOAT_VEC3)
-        return function(v) { gl.uniform3fv(loc, v); };
+        return function() {
+          // I hope they don't use -1,-1,-1 as their first draw
+          var old = new Float32Array([-1, -1, -1]);
+          return function(v) {
+            if (v[0] != old[0] || v[1] != old[1] || v[2] != old[2]) {
+              gl.uniform3fv(loc, v);
+            }
+          };
+        }();
       if (type == gl.FLOAT_VEC4)
         return function(v) { gl.uniform4fv(loc, v); };
       if (type == gl.INT)
@@ -332,6 +359,9 @@ tdl.programs.Program = function(vertexShader, fragmentShader) {
 
   for (var ii = 0; ii < numUniforms; ++ii) {
     var info = gl.getActiveUniform(program, ii);
+    if (!info) {
+      break;
+    }
     name = info.name;
     if (tdl.string.endsWith(name, "[0]")) {
       name = name.substr(0, name.length - 3);
@@ -360,7 +390,7 @@ tdl.programs.handleContextLost_ = function() {
 tdl.programs.init_ = function() {
   if (!gl.tdl.programs) {
     gl.tdl.programs = { };
-    tdl.webgl.registerContextLostHandler(tdl.programs.handleContextLost_, true);
+    tdl.webgl.registerContextLostHandler(gl.canvas, tdl.programs.handleContextLost_, true);
   }
   if (!gl.tdl.programs.shaderDB) {
     gl.tdl.programs.shaderDB = { };

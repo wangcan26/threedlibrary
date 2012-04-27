@@ -968,7 +968,7 @@ tdl.primitives.createFlaredCube = function(innerSize, outerSize, layerCount) {
     normal: normals,
     texCoord: texCoords,
     indices: indices
-};
+  };
 
   // rotate it 45 degrees
   tdl.primitives.reorient(arrays, tdl.math.matrix4.rotationX(Math.PI / 4));
