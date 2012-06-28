@@ -70,8 +70,6 @@ tdl.models.Model = function(program, arrays, textures, opt_mode) {
   this.textures = textures;
   this.textureUnits = textureUnits;
   this.setProgram(program);
-
-  var that = this;
 }
 
 tdl.models.Model.prototype.setProgram = function(program) {
